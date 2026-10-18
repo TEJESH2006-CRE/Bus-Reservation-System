@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+.admin-dashboard-card {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  border: 1px solid #e8edf3;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.5rem;
+  text-align: left;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 6%);
+}
+
+.admin-dashboard-card h2 {
+  display: flex;
+  min-height: 3rem;
+  align-items: flex-end;
+}
+
+.admin-dashboard-card-action {
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.admin-dashboard-card-action:hover {
+  transform: translateY(-2px);
+  border-color: #cbdaf1;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 10%);
+}
+
+.admin-dashboard-card-action:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.admin-dashboard-icon {
+  display: inline-flex;
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 3.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.admin-card-green .admin-dashboard-icon { background: #e9f9ef; color: #16a34a; }
+.admin-card-purple .admin-dashboard-icon { background: #f4ebff; color: #9333ea; }
+.admin-card-red .admin-dashboard-icon { background: #fff0f0; color: #dc2626; }
+.admin-card-amber .admin-dashboard-icon { background: #fff7df; color: #d99000; }
+
+.admin-card-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 1rem;
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.operator-dashboard {
+  color: #1e2d5c;
+  background: #f3f4f6;
+}
+
+.operator-stat-card {
+  min-height: 176px;
+  border: 1px solid #edf0f4;
+}
+
+.operator-stat-icon,
+.operator-management-icon {
+  display: inline-flex;
+  width: 5rem;
+  height: 5rem;
+  flex: 0 0 5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.operator-management-icon-blue { background: #e8f2ff; color: #0866ec; }
+.operator-management-icon-green { background: #e5faed; color: #00a84f; }
+.operator-management-icon-purple { background: #f3eaff; color: #8612e8; }
+.operator-management-icon-amber { background: #fff6dc; color: #e9a000; }
+.operator-management-card { min-height: 140px; }
+
+.operator-routes-panel,
+.operator-buses-panel,
+.operator-trips-panel,
+.operator-bookings-panel {
+  border: 1px solid #edf0f4;
+}
+
+@media (max-width: 640px) {
+  .operator-dashboard { padding: 1rem; }
+  .operator-page-header h1 { font-size: 1.75rem; }
+  .operator-stat-card { min-height: 140px; padding: 1rem; }
+  .operator-stat-icon,
+  .operator-management-icon { width: 4rem; height: 4rem; flex-basis: 4rem; }
+}
