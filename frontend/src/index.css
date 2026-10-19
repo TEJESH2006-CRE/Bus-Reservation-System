@@ -107,3 +107,13 @@
   .operator-stat-icon,
   .operator-management-icon { width: 4rem; height: 4rem; flex-basis: 4rem; }
 }
+
+.busgo-copilot-focus {
+  outline: 3px solid #60a5fa;
+  outline-offset: 3px;
+  animation: busgo-copilot-pulse 900ms ease-in-out 2;
+}
+
+@keyframes busgo-copilot-pulse {
+  50% { outline-color: #1d4ed8; }
+}

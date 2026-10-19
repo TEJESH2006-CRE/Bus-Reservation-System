@@ -1,6 +1,7 @@
 
 import { useState } from 'react'
 import { jsPDF } from "jspdf";
+import BookingCopilot from "./BookingCopilot";
 import OperatorDashboard from "./OperatorDashboard";
 import AdminDashboard from "./AdminDashboard";
 import AdminUsers from "./AdminUsers";
@@ -8,10 +9,23 @@ import AdminOperators from "./AdminOperators";
 import AdminBookings from "./AdminBookings";
 import ResetPassword from "./ResetPassword";
 
+function SteeringWheelIcon() {
+  return (
+    <svg viewBox="0 0 40 40" aria-hidden="true" className="h-9 w-9 fill-none stroke-current">
+      <circle cx="20" cy="20" r="16" strokeWidth="3.5" />
+      <circle cx="20" cy="20" r="4" strokeWidth="3" />
+      <path d="M5 15h30M20 24v11M8 15l9 8m15-8-9 8" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function App() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [date, setDate] = useState('')
+  const [date, setDate] = useState(() => {
+    const today = new Date()
+    return new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+  })
   const [message, setMessage] = useState('')
   const [buses, setBuses] = useState([])
   const [selectedTrip, setSelectedTrip] = useState(null)
@@ -44,7 +58,7 @@ function App() {
     return <ResetPassword />;
   }
 
-  const fetchBookingHistory = async () => {
+  const fetchBookingHistory = async ({ silent = false } = {}) => {
   try {
     setHistoryLoading(true);
 
@@ -67,8 +81,10 @@ function App() {
 
     setBookingHistory(data.bookings || []);
     setShowBookingHistory(true);
+    return true;
   } catch (error) {
-    alert(error.message);
+    if (!silent) alert(error.message);
+    return false;
   } finally {
     setHistoryLoading(false);
   }
@@ -199,241 +215,237 @@ const deleteCompletedBooking = async (bookingId) => {
 };
 
 
-const downloadTicketPDF = () => {
-  if (!confirmedTicket || !selectedTrip) return;
+const downloadTicketPDF = (
+  ticket = confirmedTicket,
+  trip = selectedTrip,
+  ticketFrom = from,
+  ticketTo = to,
+  ticketDate = date
+) => {
+  if (!ticket || !trip) return;
 
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const navy = [15, 23, 42];
+  const blue = [37, 99, 235];
+  const muted = [100, 116, 139];
+  const margin = 16;
+  const dateLabel = ticketDate
+    ? new Date(ticketDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "-";
 
-  // Header
-  doc.setFillColor(22, 101, 52);
-  doc.rect(0, 0, pageWidth, 30, "F");
-
+  doc.setFillColor(...navy);
+  doc.rect(0, 0, pageWidth, 44, "F");
+  doc.setFillColor(...blue);
+  doc.rect(0, 44, pageWidth, 3, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("BUS RESERVATION", pageWidth / 2, 13, {
-    align: "center",
-  });
-
+  doc.setFontSize(19);
+  doc.text("BUSGO", margin, 19);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("E-TICKET / BOOKING CONFIRMATION", pageWidth / 2, 23, {
-    align: "center",
-  });
-
-  // Booking details
-  doc.setTextColor(22, 101, 52);
+  doc.setTextColor(203, 213, 225);
+  doc.text("YOUR JOURNEY, WELL PLANNED", margin, 27);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("BOOKING CONFIRMED", 20, 42);
-
-  doc.setFillColor(240, 253, 244);
-  doc.roundedRect(20, 49, 170, 20, 3, 3, "F");
-
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text("E-TICKET", pageWidth - margin, 20, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.setTextColor(80, 80, 80);
-  doc.text("PNR", 27, 57);
+  doc.text("BOOKING CONFIRMED", pageWidth - margin, 28, { align: "right" });
 
+  doc.setFillColor(239, 246, 255);
+  doc.roundedRect(margin, 55, pageWidth - margin * 2, 21, 3, 3, "F");
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...muted);
+  doc.text("BOOKING REFERENCE / PNR", margin + 6, 63);
   doc.setFontSize(12);
-  doc.setTextColor(22, 101, 52);
-  doc.text(String(confirmedTicket.pnr || "Not available"), 27, 64);
+  doc.setTextColor(...navy);
+  doc.text(String(ticket.pnr || "Not available"), margin + 6, 71);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...muted);
+  doc.text(`Issued ${new Date().toLocaleDateString("en-IN")}`, pageWidth - margin - 6, 68, { align: "right" });
 
-  // Journey details
-  doc.setFontSize(12);
-  doc.text("JOURNEY DETAILS", 20, 84);
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(margin, 84, pageWidth - margin * 2, 48, 3, 3, "FD");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...muted);
+  doc.text("FROM", margin + 7, 94);
+  doc.text("TO", pageWidth - margin - 7, 94, { align: "right" });
+  doc.setFontSize(15);
+  doc.setTextColor(...navy);
+  doc.text(String(ticketFrom || "-"), margin + 7, 104, { maxWidth: 62 });
+  doc.text(String(ticketTo || "-"), pageWidth - margin - 7, 104, { align: "right", maxWidth: 62 });
+  doc.setDrawColor(148, 163, 184);
+  doc.line(margin + 75, 105, pageWidth - margin - 75, 105);
+  doc.setFillColor(...blue);
+  doc.circle(pageWidth / 2, 105, 3, "F");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  doc.text(String(trip.departureTime || "-"), margin + 7, 114);
+  doc.text(String(trip.arrivalTime || "-"), pageWidth - margin - 7, 114, { align: "right" });
+  doc.setFontSize(8);
+  doc.setTextColor(...muted);
+  doc.text(dateLabel, pageWidth / 2, 125, { align: "center" });
 
-  doc.setDrawColor(200, 200, 200);
-  doc.line(20, 88, 190, 88);
-
-  const leftX = 25;
-  const rightX = 115;
-
-  const addDetail = (label, value, x, y) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(label, x, y);
-
+  const infoY = 140;
+  const infoW = (pageWidth - margin * 2 - 6) / 3;
+  const info = [
+    ["BUS", trip.bus?.busName || "Bus"],
+    ["BUS TYPE", trip.bus?.busType || trip.bus?.seatType || "-"],
+    ["BUS NUMBER", trip.bus?.busNumber || "-"],
+  ];
+  info.forEach(([label, value], index) => {
+    const x = margin + index * (infoW + 3);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x, infoY, infoW, 24, 2, 2, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(40, 40, 40);
-    doc.text(String(value ?? "-"), x, y + 8);
-  };
+    doc.setFontSize(7);
+    doc.setTextColor(...muted);
+    doc.text(label, x + 4, infoY + 8);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...navy);
+    doc.text(String(value), x + 4, infoY + 17, { maxWidth: infoW - 8 });
+  });
 
-  addDetail("FROM", from, leftX, 100);
-  addDetail("TO", to, rightX, 100);
+  const ticketAmenities = Array.isArray(trip.bus?.amenities)
+    ? trip.bus.amenities.filter(Boolean)
+    : [];
+  doc.setFillColor(239, 246, 255);
+  doc.roundedRect(margin, 168, pageWidth - margin * 2, 17, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...blue);
+  doc.text("ONBOARD AMENITIES", margin + 5, 175);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(ticketAmenities.length ? ticketAmenities.join("  ·  ") : "Amenities not listed", margin + 5, 181, {
+    maxWidth: pageWidth - margin * 2 - 10,
+  });
 
-  addDetail("DEPARTURE", selectedTrip.departureTime, leftX, 122);
-  addDetail("ARRIVAL", selectedTrip.arrivalTime, rightX, 122);
-
-  addDetail("JOURNEY DATE", date, leftX, 144);
-  addDetail("BUS NAME", selectedTrip.bus?.busName, rightX, 144);
-
-  addDetail("BUS TYPE", selectedTrip.bus?.busType, leftX, 166);
-  addDetail("BUS NUMBER", selectedTrip.bus?.busNumber, rightX, 166);
-
-  // Passenger details
-  let y = 194;
-
-  doc.setTextColor(22, 101, 52);
+  let y = 190;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("PASSENGER DETAILS", 20, y);
+  doc.setTextColor(...navy);
+  doc.text("Passenger details", margin, y);
+  y += 6;
 
-  doc.setDrawColor(200, 200, 200);
-  doc.line(20, y + 4, 190, y + 4);
-
-  y += 16;
-
-  confirmedTicket.passengers.forEach((passenger, index) => {
-    if (y > 255) {
+  ticket.passengers.forEach((passenger, index) => {
+    if (y + 20 > 270) {
       doc.addPage();
-      y = 20;
+      doc.setFillColor(...navy);
+      doc.rect(0, 0, pageWidth, 20, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(255, 255, 255);
+      doc.text("PASSENGER DETAILS · CONTINUED", margin, 13);
+      y = 30;
     }
 
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 18, 2, 2, "FD");
+    doc.setFillColor(...blue);
+    doc.roundedRect(margin + 4, y + 4, 17, 10, 2, 2, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(22, 101, 52);
-    doc.text(`Passenger ${index + 1}`, 25, y);
-
-    y += 8;
-
-    addDetail("NAME", passenger.name, leftX, y);
-    addDetail("AGE", passenger.age, rightX, y);
-
+    doc.setFontSize(7);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`SEAT ${passenger.seatNumber || "-"}`, margin + 12.5, y + 10.5, { align: "center" });
+    doc.setFontSize(9);
+    doc.setTextColor(...navy);
+    doc.text(String(passenger.name || `Passenger ${index + 1}`), margin + 26, y + 8, { maxWidth: 92 });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text(`${passenger.age || "-"} yrs  ·  ${passenger.gender || "-"}  ·  ${passenger.phone || "-"}`, margin + 26, y + 14, { maxWidth: pageWidth - margin * 2 - 57 });
     y += 20;
-
-    addDetail("GENDER", passenger.gender, leftX, y);
-    addDetail("PHONE", passenger.phone, rightX, y);
-
-    y += 20;
-
-    addDetail("SEAT NUMBER", passenger.seatNumber, leftX, y);
-
-    y += 25;
   });
 
-  // Fare summary
-  if (y > 270) {
+  if (y + 25 > 282) {
     doc.addPage();
     y = 30;
   }
-
-  doc.setFillColor(22, 101, 52);
-  doc.roundedRect(20, y, 170, 20, 3, 3, "F");
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("TOTAL FARE", 28, y + 13);
-
-  doc.setFontSize(14);
-  doc.text(`Rs. ${confirmedTicket.fare}`, 180, y + 13, {
-    align: "right",
-  });
-
-  // Footer
-  doc.setTextColor(100, 100, 100);
+  doc.setFillColor(...navy);
+  doc.roundedRect(margin, y + 2, pageWidth - margin * 2, 23, 3, 3, "F");
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text(
-    "Thank you for booking with us!",
-    pageWidth / 2,
-    290,
-    { align: "center" }
-  );
+  doc.setFontSize(9);
+  doc.setTextColor(203, 213, 225);
+  doc.text("TOTAL PAID", margin + 7, y + 16);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`INR ${ticket.fare}`, pageWidth - margin - 7, y + 17, { align: "right" });
 
-  const fileId = confirmedTicket.pnr || confirmedTicket.bookingId;
+  for (let page = 1; page <= doc.getNumberOfPages(); page += 1) {
+    doc.setPage(page);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text("Thank you for travelling with BusGo", margin, pageHeight - 8);
+    doc.text(`${page} / ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+  }
+
+  const fileId = ticket.pnr || ticket.bookingId;
   doc.save(`Bus-Ticket-${fileId}.pdf`);
 };
 
-const downloadBookingPDF = () => {
-  if (!selectedBooking) return;
+const downloadBookingPDF = (booking = selectedBooking) => {
+  if (!booking) return;
 
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
+  const trip = booking.trip || {};
+  const passengerRecords = Array.isArray(booking.passengers)
+    ? booking.passengers
+    : [];
+  const passengers = passengerRecords.length
+    ? passengerRecords.map((passenger) => ({
+        seatNumber:
+          passenger.seat?.seatNumber ||
+          booking.seats?.find(
+            (seat) => String(seat._id) === String(passenger.seat?._id || passenger.seat)
+          )?.seatNumber ||
+          "-",
+        name: passenger.name || "Passenger",
+        age: passenger.age,
+        gender: passenger.gender,
+        phone: passenger.phone,
+      }))
+    : (booking.seats || []).map((seat, index) => ({
+        seatNumber: seat.seatNumber || "-",
+        name: `Passenger ${index + 1}`,
+        age: "-",
+        gender: "-",
+        phone: "-",
+      }));
 
-  doc.setFillColor(22, 101, 52);
-  doc.rect(0, 0, pageWidth, 30, "F");
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("BUS RESERVATION", pageWidth / 2, 13, {
-    align: "center",
-  });
-
-  doc.setFontSize(9);
-  doc.text("E-TICKET / BOOKING CONFIRMATION", pageWidth / 2, 23, {
-    align: "center",
-  });
-
-  doc.setTextColor(22, 101, 52);
-  doc.setFontSize(12);
-  doc.text("BOOKING DETAILS", 20, 45);
-
-  const addDetail = (label, value, x, y) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(label, x, y);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(40, 40, 40);
-    doc.text(String(value ?? "-"), x, y + 8);
+  const ticket = {
+    bookingId: booking._id,
+    pnr: booking.pnr,
+    fare: booking.totalAmount,
+    passengers,
   };
 
-  addDetail("PNR", selectedBooking.pnr, 25, 60);
-  addDetail("FROM", selectedBooking.trip?.route?.from, 25, 85);
-  addDetail("TO", selectedBooking.trip?.route?.to, 115, 85);
-
-  addDetail(
-    "JOURNEY DATE",
-    selectedBooking.trip?.journeyDate
-      ? new Date(selectedBooking.trip.journeyDate).toLocaleDateString()
-      : "-",
-    25,
-    110
+  downloadTicketPDF(
+    ticket,
+    trip,
+    trip.route?.from,
+    trip.route?.to,
+    trip.journeyDate
   );
-
-  addDetail("DEPARTURE", selectedBooking.trip?.departureTime, 115, 110);
-  addDetail("ARRIVAL", selectedBooking.trip?.arrivalTime, 25, 135);
-
-  addDetail(
-    "SEATS",
-    selectedBooking.seats?.map((seat) => seat.seatNumber).join(", "),
-    115,
-    135
-  );
-
-  doc.setFillColor(22, 101, 52);
-  doc.roundedRect(20, 165, 170, 20, 3, 3, "F");
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("TOTAL FARE", 28, 178);
-  doc.text(`Rs. ${selectedBooking.totalAmount}`, 180, 178, {
-    align: "right",
-  });
-
-  doc.setTextColor(100, 100, 100);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text(
-    "Thank you for booking with us!",
-    pageWidth / 2,
-    200,
-    { align: "center" }
-  );
-
-  doc.save(`Bus-Ticket-${selectedBooking.pnr || selectedBooking._id}.pdf`);
 };
-
 const emailBookingTicket = async (booking) => {
   if (!booking) return;
 
@@ -690,6 +702,94 @@ async function lockSeat(seatId) {
   }
 }
 
+async function toggleSeat(seat) {
+  const isSelected = selectedSeats.includes(seat._id);
+
+  if (isSelected) {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/seats/${seat._id}/release`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setMessage(data.message || "Could not release seat.");
+        return;
+      }
+
+      setSelectedSeats((prev) => prev.filter((id) => id !== seat._id));
+      setAvailableSeats((prev) => prev.map((item) =>
+        item._id === seat._id ? { ...item, status: "available" } : item
+      ));
+      return;
+    } catch (error) {
+      setMessage("Cannot connect to the server.");
+      return;
+    }
+  }
+
+  if (selectedSeats.length >= 6) {
+    alert("You can select a maximum of 6 seats.");
+    return;
+  }
+
+  const success = await lockSeat(seat._id);
+  if (success) {
+    setSelectedSeats((prev) => [...prev, seat._id]);
+    setAvailableSeats((prev) => prev.map((item) =>
+      item._id === seat._id ? { ...item, status: "locked" } : item
+    ));
+  }
+}
+
+function renderBerthSeat(seat, index, deck) {
+  const isSelected = selectedSeats.includes(seat._id);
+  const isUnavailable = seat.status !== "available" && !isSelected;
+  const fare = selectedTrip.sleeperFare ?? selectedTrip.fare;
+  const isLadiesSeat = Boolean(seat.isLadiesOnly);
+
+  return (
+    <div
+      key={seat._id}
+      style={{ gridColumn: [1, 3, 4][index % 3], gridRow: Math.floor(index / 3) + 1 }}
+      className="flex min-w-0 flex-col items-center"
+    >
+      <button
+        type="button"
+        disabled={isUnavailable}
+        onClick={() => toggleSeat(seat)}
+        aria-pressed={isSelected}
+        aria-label={`${seat.seatNumber}, ${deck} berth, ${isUnavailable ? "sold" : `₹${fare}`}`}
+        className={`relative flex h-28 w-full max-w-[72px] flex-col items-center justify-between overflow-hidden rounded-xl border bg-white px-2 py-2 transition ${
+          isUnavailable
+            ? "border-slate-200 bg-slate-200 text-slate-400"
+            : isSelected
+            ? isLadiesSeat
+              ? "border-pink-500 text-pink-500 shadow-sm"
+              : "border-blue-600 text-blue-600 shadow-sm"
+            : "border-emerald-600 text-slate-700 hover:bg-emerald-50"
+        }`}
+      >
+        <span className="text-[11px] font-semibold">{seat.seatNumber}</span>
+        {isUnavailable ? (
+          <span className="text-3xl font-light leading-none text-slate-400">×</span>
+        ) : isSelected ? (
+          <span className="text-2xl font-medium leading-none">{isLadiesSeat ? "♀" : "✓"}</span>
+        ) : (
+          <span className="h-2 w-full rounded-full bg-emerald-100" />
+        )}
+      </button>
+      <span className={`mt-1 text-xs ${isUnavailable ? "text-slate-400" : "text-slate-600"}`}>
+        {isUnavailable ? "Sold" : `₹${fare}`}
+      </span>
+    </div>
+  );
+}
+
 
 async function handleBooking() {
   if (!selectedTrip || selectedSeats.length === 0) {
@@ -746,6 +846,7 @@ async function handleBooking() {
     });
 
     setShowPayment(true);
+    setCurrentPage("payment");
   } catch (error) {
     console.error("Booking error:", error);
     alert(error.message);
@@ -810,7 +911,7 @@ async function handleDemoPayment() {
     }
 
     // Step 3: Prepare ticket details
-    setConfirmedTicket({
+    const ticketDetails = {
       bookingId: pendingBooking.bookingId,
       passengers: passengers.map((passenger) => ({
         seatNumber:
@@ -825,7 +926,8 @@ async function handleDemoPayment() {
       })),
       fare: Number(selectedTrip?.fare) * passengers.length,
       pnr: paymentData.booking?.pnr,
-    });
+    };
+    setConfirmedTicket(ticketDetails);
 
     
 try {
@@ -938,9 +1040,11 @@ try {
 }
 
 
+    downloadTicketPDF(ticketDetails);
     setShowPayment(false);
     setPendingBooking(null);
     setShowTicket(true);
+    setCurrentPage("confirmation");
     setSelectedSeats([]);
     setShowPassengerForm(false);
     setPassengers([]);
@@ -999,6 +1103,94 @@ async function handleSearch() {
     setMessage('Cannot connect to the server.')
   }
 }
+
+const focusCopilotElement = (elementId) => {
+  window.setTimeout(() => {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (typeof element.focus === "function") element.focus({ preventScroll: true });
+    element.classList.add("busgo-copilot-focus");
+    window.setTimeout(() => element.classList.remove("busgo-copilot-focus"), 1800);
+  }, 100);
+};
+
+const navigateFromCopilot = async (target) => {
+  if (target === "login" || !token) {
+    setAuthMode("login");
+    return "login";
+  }
+
+  if (target === "search") {
+    setAuthMode("");
+    setCurrentPage("search");
+    focusCopilotElement("busgo-search-from");
+    return "opened";
+  }
+
+  if (target === "results") {
+    setCurrentPage("search");
+    focusCopilotElement("busgo-first-view-seats");
+    return "choose-bus";
+  }
+
+  if (target === "seats") {
+    if (currentPage === "payment" || currentPage === "confirmation") return "locked";
+    if (currentPage === "seats" && selectedTrip) {
+      focusCopilotElement("busgo-seat-layout");
+      return "seat-map";
+    }
+    if (currentPage === "passenger" && selectedTrip) {
+      setCurrentPage("seats");
+      focusCopilotElement("busgo-seat-layout");
+      return "seat-map";
+    }
+    setCurrentPage("search");
+    if (buses.length > 0) {
+      focusCopilotElement("busgo-first-view-seats");
+      return "choose-bus";
+    }
+    focusCopilotElement("busgo-search-from");
+    return "search-first";
+  }
+
+  if (target === "passenger") {
+    if (currentPage !== "passenger") return "unavailable";
+    focusCopilotElement("busgo-passenger-details");
+    return "passenger";
+  }
+
+  if (target === "pay") {
+    if (currentPage === "payment" && showPayment && pendingBooking) {
+      focusCopilotElement("busgo-pay-now");
+      return "payment";
+    }
+    if (currentPage === "passenger") {
+      focusCopilotElement("busgo-confirm-booking");
+      return "passenger";
+    }
+    return "not-ready";
+  }
+
+  if (target === "confirmation") {
+    if (currentPage === "confirmation" && confirmedTicket) {
+      focusCopilotElement("busgo-download-confirmed-ticket");
+      return "confirmation";
+    }
+    return "unavailable";
+  }
+
+  return "unavailable";
+};
+
+const openBookingsFromCopilot = async () => {
+  if (!token || (user?.role && user.role !== "customer")) return false;
+  const loaded = await fetchBookingHistory({ silent: true });
+  if (!loaded) return false;
+  setCurrentPage("bookings");
+  focusCopilotElement("busgo-bookings");
+  return true;
+};
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -1224,14 +1416,17 @@ onClick={async () => {
 )}
 {/* My Bookings Section */}
 {currentPage === "bookings" && showBookingHistory && (
-  <section className="mx-auto mb-8 max-w-5xl rounded-xl bg-white p-6 shadow-md">
+  <section id="busgo-bookings" className="mx-auto mb-8 max-w-5xl rounded-xl bg-white p-6 shadow-md">
     <div className="flex items-center justify-between">
       <h2 className="text-2xl font-bold text-gray-800">
         My Bookings
       </h2>
 
       <button
-        onClick={() => setShowBookingHistory(false)}
+        onClick={() => {
+          setShowBookingHistory(false);
+          setCurrentPage("search");
+        }}
         className="rounded bg-gray-200 px-4 py-2 hover:bg-gray-300"
       >
         Close
@@ -1305,7 +1500,7 @@ onClick={async () => {
             </p>
             <p><strong>Total:</strong> ₹{booking.totalAmount}</p>
             <button
-  onClick={downloadBookingPDF}
+  onClick={() => downloadBookingPDF(booking)}
   className="mt-4 rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700"
 >
   Download Ticket as PDF
@@ -1395,10 +1590,11 @@ onClick={async () => {
   </div>
 )}
 
-{!authMode && token && currentPage === "search" && (
+{!authMode && token && ["search", "seats", "passenger", "payment", "confirmation"].includes(currentPage) && (
   <>
     {/* Bus Search Section */}
     <main className="px-6 py-16">
+      {currentPage === "search" && <>
         <div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 shadow-lg">
           <h2 className="mb-2 text-center text-3xl font-bold text-gray-800">
             Book Your Bus Tickets
@@ -1408,8 +1604,9 @@ onClick={async () => {
             Find and book your bus journey with ease.
           </p>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr_1.2fr_auto]">
             <input
+              id="busgo-search-from"
               type="text"
               placeholder="From"
               value={from}
@@ -1417,7 +1614,18 @@ onClick={async () => {
               className="rounded-lg border border-gray-300 p-3 outline-none focus:border-blue-600"
             />
 
+            <button
+              type="button"
+              aria-label="Swap From and To"
+              title="Swap From and To"
+              onClick={() => { setFrom(to); setTo(from); }}
+              className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-xl text-blue-700 shadow-sm transition hover:bg-blue-100 md:mx-0"
+            >
+              ⇄
+            </button>
+
             <input
+              id="busgo-search-to"
               type="text"
               placeholder="To"
               value={to}
@@ -1425,14 +1633,31 @@ onClick={async () => {
               className="rounded-lg border border-gray-300 p-3 outline-none focus:border-blue-600"
             />
 
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-gray-300 p-3 outline-none focus:border-blue-600"
-            />
+            <div className="space-y-2">
+              <input
+                id="busgo-search-date"
+                type="date"
+                min={new Date().toISOString().slice(0, 10)}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-blue-600"
+              />
+              <div className="flex gap-2">
+                {[0, 1].map((offset) => {
+                  const day = new Date();
+                  day.setDate(day.getDate() + offset);
+                  const value = new Date(day.getTime() - day.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+                  return (
+                    <button key={offset} type="button" onClick={() => setDate(value)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${date === value ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-700"}`}>
+                      {offset === 0 ? "Today" : "Tomorrow"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <button
+              id="busgo-search-submit"
               onClick={handleSearch}
               className="rounded-lg bg-blue-700 p-3 font-semibold text-white hover:bg-blue-800"
             >
@@ -1450,7 +1675,7 @@ onClick={async () => {
 
         {/* Bus Results */}
         <section className="mx-auto mt-8 max-w-5xl space-y-4">
-          {buses.map((bus) => (
+          {buses.map((bus, index) => (
             <div
               key={bus._id}
               className="rounded-xl bg-white p-6 shadow-md"
@@ -1487,6 +1712,7 @@ onClick={async () => {
                 </div>
                 <div className="flex items-center">
   <button
+   id={index === 0 ? "busgo-first-view-seats" : undefined}
    onClick={() => {
   if (!token) {
     setMessage('Please login first to book tickets.')
@@ -1494,6 +1720,7 @@ onClick={async () => {
     return
   }
   setSelectedTrip(bus)
+  setCurrentPage("seats")
   fetchSeats(bus._id)
 }}
     className="rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800"
@@ -1505,44 +1732,66 @@ onClick={async () => {
             </div>
           ))}
                 </section>
+      </>}
 
         {/* Selected Bus Section */}
-        {selectedTrip && (
-          <section className="mx-auto mt-8 max-w-5xl rounded-xl bg-white p-6 shadow-md">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Select Seats
-            </h2>
-
-            <p className="mt-2 text-gray-600">
-              Selected Bus: {selectedTrip.bus?.busName || "Bus"}
-            </p>
-
-            <p className="mt-1 text-gray-600">
-              Trip ID: {selectedTrip._id}
-            </p>
+        {selectedTrip && (currentPage === "seats" || currentPage === "passenger") && (
+          <section className="mx-auto mt-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/60">
+            {currentPage === "seats" && <>
+            <div className="mb-7 flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700">Choose your seats</p>
+                <h2 className="mt-1 text-2xl font-bold text-slate-900">Select seats for your trip</h2>
+                <p className="mt-1 text-slate-500">{selectedTrip.bus?.busName || "Bus"} <span className="mx-1">·</span> {selectedTrip.bus?.busType || selectedTrip.bus?.seatType || "Bus service"}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-sm font-medium">
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-emerald-800"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Available</span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-2 text-blue-800"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" />Selected</span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-slate-600"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" />Unavailable</span>
+              </div>
+            </div>
             <div className="mt-6">
-  <h3 className="mb-4 text-lg font-bold text-gray-800">
-    Choose Your Seats
-  </h3>
+  <div className="mb-4 flex items-center justify-between">
+    <h3 className="text-lg font-bold text-slate-900">Choose a seat</h3>
+    <span className="text-sm text-slate-500">Up to 6 seats per booking</span>
+  </div>
 
   
+  <div id="busgo-seat-layout" tabIndex={-1} className="rounded-3xl border border-slate-200 bg-slate-100 p-4 sm:p-6">
+  {selectedTrip?.bus?.seatType === "Seater" && <div className="mb-6 flex items-center justify-between rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-sm">
+    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Front of bus</span>
+    <span className="flex items-center gap-2 text-sm font-semibold"><SteeringWheelIcon /> Driver</span>
+  </div>}
 {selectedTrip?.bus?.seatType === "Seater-Sleeper" ? (
   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
     
 {["Seater", "Lower", "Upper"].map((section) => (
   <div
     key={section}
-    className="rounded-xl border border-gray-300 bg-white p-4"
+    className={`${section === "Seater" ? "md:col-span-2" : ""} rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm`}
   >
-    <h3 className="mb-4 text-center text-lg font-bold text-gray-800">
-      {section === "Seater" ? "SEATER" : `${section.toUpperCase()} BERTH`}
-    </h3>
+    <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+      <div>
+        <h3 className="text-base font-bold text-slate-900">
+          {section === "Seater" ? "Seater cabin" : `${section} deck`}
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">
+          {section === "Seater" ? "2 + 2 seating with a center aisle" : "Sleeper berths"}
+        </p>
+      </div>
+      {section === "Lower" ? <span aria-label="Driver position" title="Driver position" className="text-slate-400"><SteeringWheelIcon /></span> : (
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+          {availableSeats.filter((seat) => section === "Seater" ? seat.seatType === "Seater" : seat.seatType === "Sleeper" && seat.position === section).length} {section === "Seater" ? "seats" : "berths"}
+        </span>
+      )}
+    </div>
 
+    <div className="rounded-[22px] border border-slate-300 bg-white p-3 sm:p-4">
     <div
   className={
     section === "Seater"
       ? "grid grid-cols-5 gap-3"
-      : "grid grid-cols-2 gap-3"
+      : "grid grid-cols-4 gap-3"
   }
 >
   {/*
@@ -1555,20 +1804,27 @@ onClick={async () => {
     ? seat.seatType === "Seater"
     : seat.seatType === "Sleeper" && seat.position === section
 )
-.slice(0, section === "Seater" ? 29 : undefined)
   
   .map((seat, index) => {
           const isSelected = selectedSeats.includes(seat._id);
+          if (section !== "Seater") {
+            return renderBerthSeat(seat, index, section);
+          }
 
           return (
             <button
               key={seat._id}
-             style={
-  section === "Seater"
-    ? (() => {
+             style={(() => {
+  if (section !== "Seater") {
+    return {
+      gridColumn: [1, 3, 4][index % 3],
+      gridRow: Math.floor(index / 3) + 1,
+    };
+  }
+
       const totalSeaterSeats = Math.min(
   availableSeats.filter((item) => item.seatType === "Seater").length,
-  29
+  availableSeats.length
 );
 const lastRowSeats = totalSeaterSeats % 4 || 4;
 const regularSeats = totalSeaterSeats - lastRowSeats;
@@ -1583,9 +1839,7 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
           gridColumn: index - regularSeats + 1,
           gridRow: Math.floor(regularSeats / 4) + 1,
         };
-      })()
-    : undefined
-}
+      })()}
               disabled={seat.status !== "available" && !isSelected}
               onClick={async () => {
                 if (isSelected) {
@@ -1633,24 +1887,26 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
                   );
                 }
               }}
-              className={`flex min-h-28 w-full flex-col items-center justify-center rounded-xl border-2 p-3 font-bold shadow-sm transition ${
+      className={`flex ${section === "Seater" ? "min-h-20" : "min-h-28"} w-full flex-col items-center justify-center rounded-xl border-2 p-3 font-bold shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
                 isSelected
                   ? "border-blue-600 bg-blue-600 text-white"
                   : seat.status === "available"
-                  ? "border-green-500 bg-green-100 text-green-800 hover:bg-green-200"
-                  : "border-red-500 bg-red-100 text-red-800"
+                  ? "border-emerald-400 bg-white text-slate-800 hover:border-emerald-600 hover:bg-emerald-50"
+                  : "border-slate-300 bg-slate-200 text-slate-500"
               }`}
             >
              
 <span className="block">{seat.seatNumber}</span>
-<span className="mt-1 block text-xs">
-  {seat.position}
+<span className="mt-1 block text-xs font-medium opacity-75">
+  {section === "Seater" ? seat.position : `${section} berth`}
 </span>
+<span className="mt-2 block text-xs font-semibold opacity-80">₹{seat.seatType === "Sleeper" ? (selectedTrip.sleeperFare ?? selectedTrip.fare) : (selectedTrip.seaterFare ?? selectedTrip.fare)}</span>
 
 
             </button>
           );
         })}
+    </div>
     </div>
 
     {availableSeats.filter((seat) =>
@@ -1666,8 +1922,42 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
 ))}
 
   </div>
+) : selectedTrip?.bus?.seatType === "Sleeper" ? (
+  <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    {["Lower", "Upper"].map((deck) => {
+      const deckSeats = availableSeats
+        .filter((seat) => seat.seatType === "Sleeper" && seat.position === deck)
+        .sort((a, b) => Number(a.seatNumber.replace(/\D/g, "")) - Number(b.seatNumber.replace(/\D/g, "")));
+
+      return (
+        <section key={deck} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">{deck} deck</h3>
+              <p className="mt-1 text-xs text-slate-500">Sleeper berths</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {deck === "Lower" && <span aria-label="Driver position" title="Driver position" className="text-slate-400"><SteeringWheelIcon /></span>}
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{deckSeats.length} berths</span>
+            </div>
+          </div>
+          <div className="rounded-[22px] border border-slate-300 bg-white p-3 sm:p-4">
+            <div className="grid grid-cols-4 gap-3 sm:gap-4">
+              {deckSeats.map((seat, index) => renderBerthSeat(seat, index, deck))}
+            </div>
+          </div>
+          {deckSeats.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No {deck.toLowerCase()} berths found.</p>}
+        </section>
+      );
+    })}
+  </div>
 ) : (
-  <div className="grid w-full max-w-sm grid-cols-5 gap-3">
+  <section className="w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+  <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+    <div><h3 className="text-base font-bold text-slate-900">Seater cabin</h3><p className="mt-1 text-xs text-slate-500">2 + 2 layout with center aisle</p></div>
+    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{availableSeats.filter((seat) => seat.seatType === "Seater").length} seats</span>
+  </div>
+  <div className="mx-auto grid w-full max-w-3xl grid-cols-5 gap-3 sm:gap-4">
     {availableSeats
       .filter((seat) => seat.seatType === "Seater")
       .map((seat, index) => {
@@ -1745,26 +2035,29 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
               );
             }
           }}
-       className={`flex w-full min-w-0 flex-col items-center justify-center rounded-lg border px-1 py-3 font-semibold ${
+       className={`flex min-h-20 w-full min-w-0 flex-col items-center justify-center rounded-t-2xl rounded-b-lg border-2 px-1 py-3 font-semibold shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
   isSelected
     ? "border-blue-600 bg-blue-600 text-white"
     : seat.status === "available"
-    ? "border-green-500 bg-green-100 text-green-800 hover:bg-green-300"
-    : "border-red-500 bg-red-100 text-red-800"
+    ? "border-emerald-400 bg-white text-slate-800 hover:border-emerald-600 hover:bg-emerald-50"
+    : "border-slate-300 bg-slate-200 text-slate-500"
 }`}
         >
           <span className="block">{seat.seatNumber}</span>
 <span className="mt-1 block w-full whitespace-nowrap text-center text-xs font-semibold">
   {seat.position}
 </span>
+<span className="mt-2 text-xs font-semibold opacity-80">₹{selectedTrip.seaterFare ?? selectedTrip.fare}</span>
         </button>
       );
     })}
   </div>
+  </section>
 )}
+  </div>
 
-  <div className="mt-5 rounded-lg bg-gray-100 p-4">
-  <h3 className="text-lg font-bold text-gray-800">
+  <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+  <h3 className="text-lg font-bold text-slate-900">
     Booking Summary
   </h3>
 
@@ -1817,19 +2110,13 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
           }))
         );
         setShowPassengerForm(true);
+        setCurrentPage("passenger");
       }}
       className="mt-4 w-full rounded-lg bg-blue-700 p-3 font-semibold text-white hover:bg-blue-800"
     >
       Continue to Booking
     </button>
 
-    <button
-      onClick={fetchBookingHistory}
-      className="mt-3 w-full rounded-lg bg-green-700 p-3 font-semibold text-white hover:bg-green-800"
-      disabled={historyLoading}
-    >
-      {historyLoading ? "Loading..." : "Booking History"}
-    </button>
   </>
 )}
 
@@ -1839,8 +2126,10 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
   </div>
 </div>
 
-           {showPassengerForm && (
-  <div className="mt-6 rounded-xl border border-gray-200 p-5">
+            </>}
+
+           {showPassengerForm && currentPage === "passenger" && (
+  <div id="busgo-passenger-details" tabIndex={-1} className="mt-6 rounded-xl border border-gray-200 p-5">
     <h3 className="mb-4 text-xl font-bold text-gray-800">
       Passenger Details
     </h3>
@@ -1938,6 +2227,7 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
         </div>
 
         <button
+          id="busgo-confirm-booking"
           onClick={handleBooking}
           className="mt-5 w-full rounded-lg bg-green-600 p-3 font-semibold text-white hover:bg-green-700"
         >
@@ -1956,6 +2246,7 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
     setPassengerGender('')
     setPassengerPhone('')
     setPassengerEmail('')
+    setCurrentPage("search")
   }}
   className="mt-4 rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-300"
 >
@@ -1964,7 +2255,7 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
                </section>
     )}
 
-    {showPayment && pendingBooking && (
+    {currentPage === "payment" && showPayment && pendingBooking && (
       <section className="mx-auto mt-8 max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
         <h2 className="mb-4 text-2xl font-bold text-gray-800">
           Payment
@@ -1996,6 +2287,7 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
         </div>
 
         <button
+          id="busgo-pay-now"
           onClick={handleDemoPayment}
           className="mt-6 w-full rounded-lg bg-green-600 p-3 font-semibold text-white hover:bg-green-700"
         >
@@ -2006,6 +2298,7 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
           onClick={() => {
             setShowPayment(false);
             setPendingBooking(null);
+            setCurrentPage("passenger");
           }}
           className="mt-3 w-full rounded-lg bg-gray-200 p-3 font-semibold text-gray-700 hover:bg-gray-300"
         >
@@ -2015,7 +2308,7 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
         )}
 
     
-{showTicket && confirmedTicket && (
+{currentPage === "confirmation" && showTicket && confirmedTicket && (
   <section className="mx-auto mt-8 max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
     <div className="bg-green-700 p-5 text-center text-white">
       <h2 className="text-2xl font-bold">Booking Confirmed</h2>
@@ -2101,13 +2394,14 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
     <div className="p-5">
       
 <button
+  id="busgo-download-confirmed-ticket"
   onClick={downloadTicketPDF}
   className="mb-3 w-full rounded-lg bg-green-600 p-3 font-semibold text-white hover:bg-green-700"
 >
   Download Ticket as PDF
 </button>
       <button
-        onClick={() => setShowTicket(false)}
+        onClick={() => { setShowTicket(false); setCurrentPage("search"); }}
         className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white hover:bg-blue-700"
       >
         Close Ticket
@@ -2119,6 +2413,16 @@ const regularSeats = totalSeaterSeats - lastRowSeats;
         ,</main>
       </>
     )}
+    <BookingCopilot
+      currentPage={currentPage}
+      isAuthenticated={Boolean(token)}
+      userRole={user?.role}
+      busCount={buses.length}
+      confirmedTicket={confirmedTicket}
+      onNavigate={navigateFromCopilot}
+      onOpenBookings={openBookingsFromCopilot}
+      onDownloadConfirmedTicket={() => downloadTicketPDF()}
+    />
     </div>
   )
 }

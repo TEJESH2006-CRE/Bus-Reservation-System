@@ -201,14 +201,36 @@ const getMyBookings = async (req, res) => {
     const bookings = await Booking.find(filter)
   .populate({
     path: "trip",
-    populate: {
-      path: "route",
-    },
+    populate: [
+      { path: "route" },
+      { path: "bus" },
+    ],
   })
   .populate("seats")
   .sort({ createdAt: -1 })
   .skip(skip)
   .limit(limit);
+
+    const passengerRecords = bookings.length
+      ? await Passenger.find({
+          booking: { $in: bookings.map((booking) => booking._id) },
+        })
+          .populate("seat", "seatNumber")
+          .lean()
+      : [];
+
+    const passengersByBooking = passengerRecords.reduce((grouped, passenger) => {
+      const bookingId = String(passenger.booking);
+      grouped[bookingId] ||= [];
+      grouped[bookingId].push(passenger);
+      return grouped;
+    }, {});
+
+    const bookingsWithPassengers = bookings.map((booking) => {
+      const bookingData = booking.toObject();
+      bookingData.passengers = passengersByBooking[String(booking._id)] || [];
+      return bookingData;
+    });
 
     res.status(200).json({
       message: "Bookings fetched successfully",
@@ -223,7 +245,7 @@ const getMyBookings = async (req, res) => {
       },
 
       count: bookings.length,
-      bookings,
+      bookings: bookingsWithPassengers,
     });
   } catch (error) {
     console.error(

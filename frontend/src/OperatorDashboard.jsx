@@ -76,6 +76,14 @@ const [newBus, setNewBus] = useState({
 
 const [editingBus, setEditingBus] = useState(null);
 const [editingRoute, setEditingRoute] = useState(null);
+const [showAddRoute, setShowAddRoute] = useState(false);
+
+const [newRoute, setNewRoute] = useState({
+  from: "",
+  to: "",
+  distance: "",
+  duration: "",
+});
 const [editingTrip, setEditingTrip] = useState(null);
 
 
@@ -228,6 +236,7 @@ const fetchOperatorBookings = async () => {
         }
         className="w-full rounded-lg border p-3"
       >
+
         <option value="">Select Bus</option>
 
         {buses.map((bus) => (
@@ -671,6 +680,52 @@ const fetchOperatorBookings = async () => {
   className="w-full rounded-lg border p-3"
   placeholder="Total Seats"
 />
+        
+      {/* Bus Amenities */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Bus Amenities
+        </h3>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            "Food",
+            "Snacks",
+            "Pillow",
+            "Blankets",
+            "Bed Sheet",
+            "Water Bottle",
+            "Reading Lamp",
+            "Charging Point",
+          ].map((amenity) => (
+            <label
+              key={amenity}
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 p-3"
+            >
+              <input
+                type="checkbox"
+                checked={(editingBus.amenities || []).includes(amenity)}
+                onChange={(e) => {
+                  const currentAmenities = editingBus.amenities || [];
+
+                  setEditingBus({
+                    ...editingBus,
+                    amenities: e.target.checked
+                      ? [...currentAmenities, amenity]
+                      : currentAmenities.filter(
+                          (item) => item !== amenity
+                        ),
+                  });
+                }}
+                className="h-4 w-4 accent-blue-700"
+              />
+              <span className="text-sm text-gray-700">
+                {amenity}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
 
       <button
         onClick={async () => {
@@ -685,12 +740,15 @@ const fetchOperatorBookings = async () => {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${token}`,
                 },
-               body: JSON.stringify({
+              
+body: JSON.stringify({
   busName: editingBus.busName,
   busNumber: editingBus.busNumber,
   busType: editingBus.busType,
   totalSeats: Number(editingBus.totalSeats),
+  amenities: editingBus.amenities || [],
 }),
+
               }
             );
 
@@ -761,6 +819,75 @@ const fetchOperatorBookings = async () => {
         }
         className="w-full rounded-lg border p-3"
       />
+      
+{/* Boarding Point 1 */}
+<input
+  type="text"
+  placeholder="Boarding Point 1 (Starting City)"
+  value={editingRoute.boardingPoints?.[0] || ""}
+  onChange={(e) =>
+    setEditingRoute({
+      ...editingRoute,
+      boardingPoints: [
+        e.target.value,
+        editingRoute.boardingPoints?.[1] || "",
+      ],
+    })
+  }
+  className="w-full rounded-lg border p-3"
+/>
+
+{/* Boarding Point 2 */}
+<input
+  type="text"
+  placeholder="Boarding Point 2 (Starting City)"
+  value={editingRoute.boardingPoints?.[1] || ""}
+  onChange={(e) =>
+    setEditingRoute({
+      ...editingRoute,
+      boardingPoints: [
+        editingRoute.boardingPoints?.[0] || "",
+        e.target.value,
+      ],
+    })
+  }
+  className="w-full rounded-lg border p-3"
+/>
+
+{/* Dropping Point 1 */}
+<input
+  type="text"
+  placeholder="Dropping Point 1 (Destination City)"
+  value={editingRoute.droppingPoints?.[0] || ""}
+  onChange={(e) =>
+    setEditingRoute({
+      ...editingRoute,
+      droppingPoints: [
+        e.target.value,
+        editingRoute.droppingPoints?.[1] || "",
+      ],
+    })
+  }
+  className="w-full rounded-lg border p-3"
+/>
+
+{/* Dropping Point 2 */}
+<input
+  type="text"
+  placeholder="Dropping Point 2 (Destination City)"
+  value={editingRoute.droppingPoints?.[1] || ""}
+  onChange={(e) =>
+    setEditingRoute({
+      ...editingRoute,
+      droppingPoints: [
+        editingRoute.droppingPoints?.[0] || "",
+        e.target.value,
+      ],
+    })
+  }
+  className="w-full rounded-lg border p-3"
+/>
+
 
       <input
         type="number"
@@ -802,16 +929,16 @@ const fetchOperatorBookings = async () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            from: editingRoute.from,
-            to: editingRoute.to,
-            distance:
-              editingRoute.distance === "" ||
-              editingRoute.distance == null
-                ? undefined
-                : Number(editingRoute.distance),
-            duration: editingRoute.duration,
-          }),
+          
+body: JSON.stringify({
+  boardingPoints: (editingRoute.boardingPoints || [])
+    .map((point) => point.trim())
+    .filter(Boolean),
+  droppingPoints: (editingRoute.droppingPoints || [])
+    .map((point) => point.trim())
+    .filter(Boolean),
+}),
+
         }
       );
 
@@ -853,7 +980,140 @@ const fetchOperatorBookings = async () => {
 
 {operatorPage === "routes" && (
   <div className="operator-routes-panel mt-1 rounded-xl bg-white p-5 shadow-sm">
-  <h2 className="mb-4 text-2xl font-bold text-gray-800">My Routes</h2>
+  
+<div className="mb-4 flex items-center justify-between">
+ 
+<div className="mb-4 flex items-center justify-between">
+  <h2 className="text-2xl font-bold text-gray-800">
+    My Routes
+  </h2>
+
+  <button
+    onClick={() => setShowAddRoute((previous) => !previous)}
+    className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700"
+  >
+    {showAddRoute ? "Cancel" : "+ Add Route"}
+  </button>
+</div>
+
+
+  <button
+    onClick={() => setShowAddRoute(true)}
+    className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700"
+  >
+    + Add Route
+  </button>
+</div>
+
+
+{showAddRoute && (
+  <form
+    className="mb-6 space-y-4 rounded-lg border p-4"
+    onSubmit={async (e) => {
+      e.preventDefault();
+
+      try {
+        const token = localStorage.getItem("token");
+
+        const response = await fetch(
+          "http://localhost:5000/api/operator/routes",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              from: newRoute.from.trim(),
+              to: newRoute.to.trim(),
+              distance:
+                newRoute.distance === ""
+                  ? undefined
+                  : Number(newRoute.distance),
+              duration: newRoute.duration.trim(),
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to create route");
+          return;
+        }
+
+        setRoutes((currentRoutes) => [
+          data.route,
+          ...currentRoutes,
+        ]);
+
+        setNewRoute({
+          from: "",
+          to: "",
+          distance: "",
+          duration: "",
+        });
+
+        setShowAddRoute(false);
+        alert("Route created successfully!");
+      } catch (error) {
+        alert("Cannot connect to the server.");
+      }
+    }}
+  >
+    <input
+      type="text"
+      placeholder="From city"
+      required
+      value={newRoute.from}
+      onChange={(e) =>
+        setNewRoute({ ...newRoute, from: e.target.value })
+      }
+      className="w-full rounded-lg border p-3"
+    />
+
+    <input
+      type="text"
+      placeholder="To city"
+      required
+      value={newRoute.to}
+      onChange={(e) =>
+        setNewRoute({ ...newRoute, to: e.target.value })
+      }
+      className="w-full rounded-lg border p-3"
+    />
+
+    <input
+      type="number"
+      min="0"
+      placeholder="Distance (optional)"
+      value={newRoute.distance}
+      onChange={(e) =>
+        setNewRoute({ ...newRoute, distance: e.target.value })
+      }
+      className="w-full rounded-lg border p-3"
+    />
+
+    <input
+      type="text"
+      placeholder="Duration (optional, e.g. 6 hours)"
+      value={newRoute.duration}
+      onChange={(e) =>
+        setNewRoute({ ...newRoute, duration: e.target.value })
+      }
+      className="w-full rounded-lg border p-3"
+    />
+
+    <button
+      type="submit"
+      className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white"
+    >
+      Save New Route
+    </button>
+  </form>
+)}
+
+
   {routes.length === 0 ? (
     <p className="text-gray-500">No routes found.</p>
   ) : (
@@ -917,6 +1177,28 @@ const fetchOperatorBookings = async () => {
           <p className="text-gray-600">
             Total Seats: {bus.totalSeats}
           </p>
+          
+
+<div className="mt-2">
+  <strong className="block mb-2">Amenities:</strong>
+
+  <div className="flex flex-wrap gap-2">
+    {bus.amenities && bus.amenities.length > 0 ? (
+      bus.amenities.map((amenity) => (
+        <span
+          key={amenity}
+          className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800"
+        >
+          {amenity}
+        </span>
+      ))
+    ) : (
+      <span className="text-sm text-gray-500">None selected</span>
+    )}
+  </div>
+</div>
+
+
           <button
   onClick={() => setEditingBus(bus)}
   className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white"

@@ -24,12 +24,26 @@ const routeSchema = new mongoose.Schema(
       trim: true,
     },
 
-    stops: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
+   boardingPoints: [
+  {
+    type: String,
+    trim: true,
+  },
+],
+
+droppingPoints: [
+  {
+    type: String,
+    trim: true,
+  },
+],
+
+stops: [
+  {
+    type: String,
+    trim: true,
+  },
+],
 
     isActive: {
       type: Boolean,
@@ -41,4 +55,5 @@ const routeSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Route", routeSchema);
+module.exports =
+  mongoose.models.Route || mongoose.model("Route", routeSchema);

@@ -1,6 +1,6 @@
 const Operator = require("../models/Operator");
 const Bus = require("../models/Bus");
-const Route = require("../models/Route");
+const Route = require("../models/route");
 const Trip = require("../models/Trip");
 const Seat = require("../models/Seat");
 const Booking = require("../models/booking");
@@ -715,16 +715,26 @@ const createRoute = async (req, res) => {
       });
     }
 
-    const existingRoute = await Route.findOne({
-      from: { $regex: `^${from.trim()}$`, $options: "i" },
-      to: { $regex: `^${to.trim()}$`, $options: "i" },
-    });
+    const escapeRegex = (value) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    if (existingRoute) {
-      return res.status(400).json({
-        message: "Route already exists",
-      });
-    }
+const existingRoute = await Route.findOne({
+  from: {
+    $regex: `^${escapeRegex(String(from).trim())}$`,
+    $options: "i",
+  },
+  to: {
+    $regex: `^${escapeRegex(String(to).trim())}$`,
+    $options: "i",
+  },
+  isActive: true,
+});
+
+if (existingRoute) {
+  return res.status(400).json({
+    message: "This route already exists. Please enter a different From and To combination.",
+  });
+}
 
     const route = await Route.create({
       from: from.trim(),
@@ -751,7 +761,15 @@ const createRoute = async (req, res) => {
  // Update an existing route
 const updateRoute = async (req, res) => {
   try {
-    const { from, to, distance, duration, stops } = req.body;
+   const {
+  from,
+  to,
+  distance,
+  duration,
+  stops,
+  boardingPoints,
+  droppingPoints,
+} = req.body;
 
     const operator = await Operator.findOne({
       user: req.user.id,
@@ -783,10 +801,19 @@ const existingTrips = await Trip.exists({
 });
 
 if (existingTrips) {
-  return res.status(400).json({
-    message:
-      "Cannot update this route because active trips use it.",
-  });
+  const changingRouteDetails =
+    from !== undefined ||
+    to !== undefined ||
+    distance !== undefined ||
+    duration !== undefined ||
+    stops !== undefined;
+
+  if (changingRouteDetails) {
+    return res.status(400).json({
+      message:
+        "Cannot change route details because active trips use it. Boarding and dropping points can still be updated.",
+    });
+  }
 }
 
     if (from !== undefined || to !== undefined) {
@@ -846,15 +873,49 @@ if (existingTrips) {
       route.duration = cleanedDuration;
     }
 
-    if (stops !== undefined) {
-      if (!Array.isArray(stops)) {
-        return res.status(400).json({
-          message: "Stops must be an array",
-        });
-      }
+    
+if (stops !== undefined) {
+  if (!Array.isArray(stops)) {
+    return res.status(400).json({
+      message: "Stops must be an array",
+    });
+  }
 
-      route.stops = stops;
-    }
+  route.stops = stops;
+}
+
+if (boardingPoints !== undefined) {
+  if (
+    !Array.isArray(boardingPoints) ||
+    boardingPoints.length > 2 ||
+    boardingPoints.some(
+      (point) => typeof point !== "string" || !point.trim()
+    )
+  ) {
+    return res.status(400).json({
+      message: "Provide up to 2 valid boarding points",
+    });
+  }
+
+  route.boardingPoints = boardingPoints.map((point) => point.trim());
+}
+
+if (droppingPoints !== undefined) {
+  if (
+    !Array.isArray(droppingPoints) ||
+    droppingPoints.length > 2 ||
+    droppingPoints.some(
+      (point) => typeof point !== "string" || !point.trim()
+    )
+  ) {
+    return res.status(400).json({
+      message: "Provide up to 2 valid dropping points",
+    });
+  }
+
+  route.droppingPoints = droppingPoints.map((point) => point.trim());
+}
+
 
     await route.save();
 
